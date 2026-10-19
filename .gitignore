@@ -1,0 +1,7 @@
+.env
+
+# Build output and generated projects (see Makefile and project.yml)
+build/
+meters.xcodeproj/
+Packages/MetersKit/.build/
+.swiftpm/
