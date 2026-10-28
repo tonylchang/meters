@@ -28,8 +28,27 @@ func signedRegistryNumber(_ text: Substring) -> Int? {
     return UInt64(text).map { Int(Int64(bitPattern: $0)) }
 }
 
+/// Whether the tests run in a virtual machine, such as a hosted CI runner (`kern.hv_vmm_present`).
+let isVirtualMachine: Bool = {
+    var present: Int32 = 0
+    var size = MemoryLayout<Int32>.size
+    return sysctlbyname("kern.hv_vmm_present", &present, &size, nil, 0) == 0 && present != 0
+}()
+
+extension Trait where Self == ConditionTrait {
+    /// For checks against Apple Silicon hardware that a virtual machine replaces with virtual devices: the GPU's
+    /// utilization figure, the CPU's clusters, and the physical disk. They are skipped there, not failed, and every
+    /// Mac still runs them.
+    static var physicalMacOnly: Self {
+        .enabled(if: !isVirtualMachine, "a virtual machine has a virtual GPU, CPU topology, and disk")
+    }
+}
+
 extension LiveTests {
-    @Test("CPU clusters: this Mac's performance levels by name and size, covering every core once")
+    @Test(
+        "CPU clusters: this Mac's performance levels by name and size, covering every core once",
+        .physicalMacOnly
+    )
     func clusterMembership() throws {
         let clusters = SystemSources.cpuClusters()
         let levels =
@@ -48,7 +67,8 @@ extension LiveTests {
     }
 
     @Test(
-        "CPU clusters: weighted by core count, the cluster values agree with the total within 1 point, idle and loaded"
+        "CPU clusters: weighted by core count, the cluster values agree with the total within 1 point, idle and loaded",
+        .physicalMacOnly
     )
     func clusterAgreement() async throws {
         let clusters = SystemSources.cpuClusters()
@@ -72,9 +92,13 @@ extension LiveTests {
         }
     }
 
-    @Test("Battery: the percent is within 1 point of pmset, and the arrow follows ioreg's current")
+    // Skipped, not failed, on a Mac without a battery. There Settings greys out Battery instead, which the Settings
+    // model tests cover.
+    @Test(
+        "Battery: the percent is within 1 point of pmset, and the arrow follows ioreg's current",
+        .enabled(if: SystemSources.hasBattery(), "this Mac has no battery")
+    )
     func batteryAccuracy() throws {
-        try #require(SystemSources.hasBattery(), "this Mac has no battery")
         for _ in 0..<3 {
             let current = { () throws -> Int? in
                 try ioregSmartBattery().firstMatch(of: /"InstantAmperage" = (\d+)/).flatMap {

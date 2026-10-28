@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# The checks only read the repository, so the workflow's token can do nothing else.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint, build, test, audit, smoke
+    # GitHub's macOS 26 arm64 image. Its default is Xcode 26.6 (Swift 6.3.3, macOS 26.5 SDK); no image carries
+    # Xcode 27 yet. That is older than the Xcode 27 the project is developed with, so CI checks the README's minimum
+    # (macOS 26, Swift 6.2 or newer). Swift 6.3.3 with the 26.5 SDK compiled and linted cleanly on Oct 26, 2026.
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v5
+
+      # The image's default Xcode can change when GitHub updates it, so each run records what it used.
+      - name: Show the toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Lint
+        run: make lint
+
+      - name: Build
+        run: make build
+
+      - name: Test
+        run: make test
+
+      - name: Audit
+        run: make audit
+
+      - name: Smoke
+        run: make smoke

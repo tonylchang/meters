@@ -79,7 +79,7 @@ struct GPUTests {
         #expect(GPUModuleText.spokenUnavailable == "unavailable")
     }
 
-    @Test("This Mac's GPU reports a figure from 0 to 100")
+    @Test("This Mac's GPU reports a figure from 0 to 100", .physicalMacOnly)
     func systemSource() throws {
         let utilization = try #require(SystemSources.gpu().readUtilization())
         #expect((0...100).contains(utilization))

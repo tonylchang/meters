@@ -105,7 +105,8 @@ extension LiveTests {
     }
 
     @Test(
-        "Under a steady workload, the median reading is within 5 points of ioreg's, or 15 when the GPU was busy"
+        "Under a steady workload, the median reading is within 5 points of ioreg's, or 15 when the GPU was busy",
+        .physicalMacOnly
     )
     func gpuMatchesIoreg() async throws {
         let source = SystemSources.gpu()
@@ -138,7 +139,10 @@ extension LiveTests {
             "ours \(ours); ioreg \(theirs); \(idle)% before, so \(tolerance) points allowed")
     }
 
-    @Test("A GPU workload raises the reading to 80% or more within 3 s; it falls back within 3 s")
+    @Test(
+        "A GPU workload raises the reading to 80% or more within 3 s; it falls back within 3 s",
+        .physicalMacOnly
+    )
     func gpuFollowsLoad() async throws {
         let source = SystemSources.gpu()
         var meter = GPUMeter(source: source)

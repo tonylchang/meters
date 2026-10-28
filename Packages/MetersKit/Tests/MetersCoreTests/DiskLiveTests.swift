@@ -34,7 +34,10 @@ func ioregDiskCounters() throws -> [String: ByteCounters] {
 }
 
 extension LiveTests {
-    @Test("Writing and reading back a 1 GB file advances the counters by at least 1 GB within 3 s")
+    @Test(
+        "Writing and reading back a 1 GB file advances the counters by at least 1 GB within 3 s",
+        .physicalMacOnly
+    )
     func diskFollowsFile() async throws {
         let source = SystemDiskSource()
         let url = FileManager.default.temporaryDirectory.appending(path: "meters-disk-test-\(UUID().uuidString)")

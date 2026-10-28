@@ -32,20 +32,28 @@ generate:
 # a nonisolated accessibility method) as warnings even when warnings are errors, so also fail on any
 # warning in this repository's sources. Files that warned are touched, so a rebuild without changes
 # compiles them again and reports the same warnings instead of passing.
-WARNING_LINE := ^$(CURDIR)/[^:]+:[0-9]+:[0-9]+: warning:
+# The checkout's path reaches awk through the environment and is compared as text, not as a pattern or shell
+# quoting, so a checkout under a folder such as "meters (1)", "c++", "My Projects", or "Tony's Mac" is checked too.
+export WARNING_ROOT := $(CURDIR)/
+WARNINGS := awk 'index($$0, ENVIRON["WARNING_ROOT"]) == 1 \
+	&& substr($$0, length(ENVIRON["WARNING_ROOT"]) + 1) ~ /^[^:]+:[0-9]+:[0-9]+: warning:/' build/xcodebuild.log
 
 build: generate
 	@mkdir -p build
 	$(XCODEBUILD) -configuration Debug build 2>&1 | tee build/xcodebuild.log
 	$(XCODEBUILD) -configuration Release build 2>&1 | tee -a build/xcodebuild.log
-	@if grep -E '$(WARNING_LINE)' build/xcodebuild.log; then \
-		grep -E '$(WARNING_LINE)' build/xcodebuild.log | cut -d: -f1 | sort -u | xargs touch; \
+	@warnings="$$($(WARNINGS))"; if [ -n "$$warnings" ]; then \
+		echo "$$warnings"; \
+		echo "$$warnings" | sed -E 's/:[0-9]+:[0-9]+: warning:.*//' | sort -u | tr '\n' '\0' | xargs -0 touch; \
 		echo "error: compiler warnings in project sources"; exit 1; fi
 
 # Tests use throwaway settings domains. The preferences daemon can write their emptied files after a
 # test ends, so sweep them once the run finishes, whether it passed or not.
+# The live accuracy checks measure the whole Mac, so they run in a pass of their own after the rest. Swift 6.3
+# runs every test target in one parallel pass, and the other suites' work would show up in their CPU readings.
 test:
-	status=0; swift test --package-path $(PACKAGE) || status=$$?; \
+	status=0; swift test --package-path $(PACKAGE) --skip LiveTests || status=$$?; \
+		swift test --package-path $(PACKAGE) --skip-build --filter LiveTests || status=$$?; \
 		sleep 1; rm -f "$$HOME"/Library/Preferences/net.1x0.meters.tests.*.plist; exit $$status
 
 lint:

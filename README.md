@@ -10,7 +10,7 @@ meters keeps the few system metrics you care about in a small floating panel tha
 
 Activity Monitor and terminal tools such as btop are built for investigation; keeping them open costs screen space and attention. Menu bar monitors squeeze into a narrow, crowded strip that the notch partly blocks. meters makes a different trade-off: a panel about 100 to 190 points wide, sized to the modules you choose and placed where you want it.
 
-> **Status (Oct 12, 2026):** v1 is feature-complete and in daily use on an Apple Silicon MacBook Pro. There are no signed or notarized downloads yet, so to run meters today, [build it from source](#build-from-source).
+> **Status (Oct 27, 2026):** v1 is feature-complete and in daily use on an Apple Silicon MacBook Pro. There are no signed or notarized downloads yet, so to run meters today, [build it from source](#build-from-source).
 
 ## What it shows
 
@@ -66,7 +66,7 @@ Network and Disk have no thresholds.
 ### Requirements
 
 - An Apple Silicon Mac running macOS 26 or later. Intel Macs are not supported: per-cluster CPU and the GPU figure are Apple Silicon concepts.
-- Xcode with a Swift 6.2 or newer toolchain and the macOS 26 SDK or newer. meters is developed and tested with Xcode 27.0 (Swift 6.4) on macOS 27.2; older Xcode releases are untested.
+- Xcode with a Swift 6.2 or newer toolchain and the macOS 26 SDK or newer. meters is developed and tested with Xcode 27.1 (Swift 6.4) on macOS 27.2. Continuous integration runs the lint, build, test, audit, and smoke checks with Xcode 26.6 on GitHub's macOS 26 runner; its Swift 6.3.3 toolchain built meters without warnings on Oct 26, 2026. Xcode releases older than 26.6 are untested.
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen), for example through Homebrew: `brew install xcodegen`.
 - `make`, which comes with Xcode's command line tools.
 
