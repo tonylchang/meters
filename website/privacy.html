@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy - meters</title>
+<meta name="description" content="How the native meters app for Mac handles system readings, saved settings, and privacy, plus the local storage used by this website.">
+<style>
+  :root {
+    color-scheme: light dark;
+    --wall: radial-gradient(70% 60% at 15% 10%, #f6c9a8 0%, transparent 60%),
+            radial-gradient(60% 60% at 90% 20%, #b9c8f2 0%, transparent 62%),
+            radial-gradient(70% 70% at 70% 100%, #d6b8e8 0%, transparent 60%),
+            linear-gradient(180deg, #e9e3f0, #dfe6f2);
+    --bar: rgba(246,246,248,.62); --win: #fbfbfc; --win-title: #ececee;
+    --win-line: rgba(0,0,0,.1); --ink: #1d1d1f; --muted: #6e6e73; --accent: #0a6cdf;
+    --win-shadow: 0 0 0 .5px rgba(0,0,0,.16), 0 24px 60px -18px rgba(40,30,70,.38);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --wall: radial-gradient(70% 60% at 15% 10%, #4a2a52 0%, transparent 60%),
+              radial-gradient(60% 60% at 90% 20%, #1c3768 0%, transparent 62%),
+              radial-gradient(70% 70% at 70% 100%, #3b1f4a 0%, transparent 60%),
+              linear-gradient(180deg, #141320, #0e1220);
+      --bar: rgba(30,30,34,.55); --win: #1f1f22; --win-title: #2a2a2e;
+      --win-line: rgba(255,255,255,.1); --ink: #f2f2f4; --muted: #98989f; --accent: #4ea1ff;
+      --win-shadow: 0 0 0 .5px rgba(255,255,255,.14), 0 24px 60px -18px rgba(0,0,0,.7);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; color: var(--ink); background: #dfe6f2;
+    font: 400 16px/1.65 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased; }
+  @media (prefers-color-scheme: dark) { body { background: #0e1220; } }
+  .wall { position: fixed; inset: 0; background: var(--wall); z-index: -1; }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  a:hover { text-decoration-thickness: 2px; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+  .menubar { min-height: 34px; display: flex; align-items: center; padding: 4px 23px;
+    background: var(--bar); -webkit-backdrop-filter: blur(30px); backdrop-filter: blur(30px); font-size: 13px; }
+  .menubar a { color: inherit; font-weight: 700; text-decoration: none; }
+  main { max-width: 816px; margin: 48px auto 80px; padding: 0 24px; }
+  .win { overflow: hidden; border-radius: 12px; background: var(--win); box-shadow: var(--win-shadow); }
+  .tb { min-height: 38px; position: relative; display: flex; align-items: center; padding: 10px 14px;
+    background: var(--win-title); border-bottom: 1px solid var(--win-line); }
+  .lights { display: flex; gap: 8px; }
+  .lights i { width: 12px; height: 12px; display: block; border-radius: 50%; }
+  .lights i:nth-child(1) { background: #ff5f57; }
+  .lights i:nth-child(2) { background: #febc2e; }
+  .lights i:nth-child(3) { background: #28c840; }
+  .tb p { position: absolute; left: 70px; right: 70px; margin: 0; text-align: center;
+    color: var(--muted); font-size: 13px; font-weight: 600; line-height: 1.2; }
+  .wb { padding: 36px 40px 40px; }
+  h1 { margin: 0; font-size: clamp(1.8rem, 5vw, 2.4rem); line-height: 1.2; letter-spacing: -.03em; }
+  .updated { margin: 8px 0 24px; color: var(--muted); font-size: 13px; }
+  h2 { margin: 30px 0 10px; font-size: 20px; line-height: 1.35; letter-spacing: -.02em; }
+  p { margin: 0 0 16px; }
+  ul { margin: 0 0 16px; padding-left: 22px; }
+  li + li { margin-top: 8px; }
+  footer { padding-top: 28px; margin-top: 32px; border-top: 1px solid var(--win-line); font-size: 14px; }
+  @media (max-width: 560px) {
+    main { margin: 24px auto 40px; padding: 0 16px; }
+    .wb { padding: 26px 20px 28px; }
+  }
+</style>
+</head>
+<body>
+  <div class="wall" aria-hidden="true"></div>
+  <header class="menubar">
+    <nav aria-label="Main navigation"><a href="index.html">meters</a></nav>
+  </header>
+  <main>
+    <article class="win" aria-labelledby="policy-title">
+      <div class="tb">
+        <span class="lights" aria-hidden="true"><i></i><i></i><i></i></span>
+        <p>meters Privacy Policy</p>
+      </div>
+      <div class="wb">
+        <h1 id="policy-title">Privacy Policy</h1>
+        <p class="updated">Last updated <time datetime="2026-11-09">Nov 09, 2026</time></p>
+        <p>meters displays system readings locally on your Mac. The app does not collect or transmit your data to its developer or other parties. It has no analytics, advertising, tracking, or third-party crash-reporting service.</p>
+        <p>The app details below cover the native macOS app, listed on the App Store as <strong>meters: System Monitor</strong>. This policy also explains the local storage used by this website.</p>
+
+        <h2>System readings stay on your Mac</h2>
+        <p>meters reads system information to display the modules you choose:</p>
+        <ul>
+          <li>CPU and GPU usage, memory usage and pressure, and swap usage.</li>
+          <li>Network throughput, disk activity, and available disk space.</li>
+          <li>Battery charge and current when a battery is present, and the system's thermal state.</li>
+        </ul>
+        <p>These readings are processed on your Mac. The app makes no outgoing network connections and does not upload readings, settings, or usage information. It does not require an account.</p>
+
+        <h2>Saved settings and history</h2>
+        <p>Your module choices, display preferences, thresholds, sampling interval, and panel placement are saved locally in macOS preferences. They remain until you change or remove them.</p>
+        <p>Graph history is held in memory only and is discarded when you quit meters. It is not saved as a long-term record or sent elsewhere.</p>
+
+        <h2>Your controls</h2>
+        <ul>
+          <li>Quit meters to stop monitoring and clear its in-memory graph history.</li>
+          <li>After quitting, remove meters' local preferences or its sandbox app container to clear saved configuration. Contact the developer below if you need help.</li>
+          <li>Launch at login is optional. You can turn it off in meters Settings or macOS Login Items.</li>
+        </ul>
+        <p>There is no developer-held account or metric history to delete. macOS may create diagnostic reports according to your system settings; meters does not upload those reports itself.</p>
+
+        <h2>This website</h2>
+        <p>The homepage uses your browser's local storage to remember where you place its simulated floating panel. That saved position stays in your browser and is not sent to the developer. You can remove it by clearing this website's site data in your browser.</p>
+        <p>This website includes no analytics or advertising scripts and sets no tracking cookies. Visiting it requires your browser to request pages and images from the hosting provider. That provider may process standard request information, such as your IP address and browser information, to deliver and secure the website. This is separate from the meters app, which makes no outgoing network connections.</p>
+
+        <h2>Contact</h2>
+        <p>For privacy questions or help clearing saved settings, contact the developer through the <a href="https://github.com/tonylchang/meters/issues">meters GitHub issue tracker</a>. Information you choose to submit there is handled by GitHub.</p>
+
+        <h2>Changes to this policy</h2>
+        <p>If these practices change, this page will be updated with a new revision date.</p>
+        <footer><a href="index.html">Back to meters</a></footer>
+      </div>
+    </article>
+  </main>
+</body>
+</html>

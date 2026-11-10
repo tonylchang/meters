@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>meters - the system monitor you leave visible</title>
+<meta name="description" content="meters keeps the few system metrics you care about in a small floating panel on Mac, Windows, and Linux. It stays grey until a reading deserves your attention.">
+<!-- Direction 3: Desktop. The page is a Mac desktop; the live panel floats over it, draggable, and stays put while you scroll. -->
+<style>
+  :root {
+    color-scheme: light dark;
+    --wall: radial-gradient(70% 60% at 15% 10%, #f6c9a8 0%, transparent 60%),
+            radial-gradient(60% 60% at 90% 20%, #b9c8f2 0%, transparent 62%),
+            radial-gradient(70% 70% at 70% 100%, #d6b8e8 0%, transparent 60%),
+            linear-gradient(180deg, #e9e3f0, #dfe6f2);
+    --bar: rgba(246,246,248,.62); --bar-ink: #1d1d1f;
+    --win: #fbfbfc; --win-title: #ececee; --win-line: rgba(0,0,0,.1); --ink: #1d1d1f; --muted: #6e6e73;
+    --sep: #e3e3e6; --chip: #f0f0f2; --accent: #0a6cdf;
+    --win-shadow: 0 0 0 .5px rgba(0,0,0,.16), 0 24px 60px -18px rgba(40,30,70,.38), 0 6px 16px -6px rgba(40,30,70,.2);
+    --hud-bg: rgba(246,246,248,.66); --hud-line: rgba(0,0,0,.14); --hud-ink: rgba(0,0,0,.88); --hud-2: rgba(60,60,67,.6);
+    --amber: #ff9500; --red: #ff3b30;
+    --menu: rgba(242,242,244,.8); --menu-ink: #1d1d1f; --menu-2: #8a8a8e; --menu-hi: #0a6cdf;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --wall: radial-gradient(70% 60% at 15% 10%, #4a2a52 0%, transparent 60%),
+              radial-gradient(60% 60% at 90% 20%, #1c3768 0%, transparent 62%),
+              radial-gradient(70% 70% at 70% 100%, #3b1f4a 0%, transparent 60%),
+              linear-gradient(180deg, #141320, #0e1220);
+      --bar: rgba(30,30,34,.55); --bar-ink: #f2f2f4;
+      --win: #1f1f22; --win-title: #2a2a2e; --win-line: rgba(255,255,255,.1); --ink: #f2f2f4; --muted: #98989f;
+      --sep: #34343a; --chip: #2a2a2e; --accent: #4ea1ff;
+      --win-shadow: 0 0 0 .5px rgba(255,255,255,.14), 0 24px 60px -18px rgba(0,0,0,.7), 0 6px 16px -6px rgba(0,0,0,.5);
+      --hud-bg: rgba(40,40,44,.6); --hud-line: rgba(255,255,255,.16); --hud-ink: rgba(255,255,255,.92); --hud-2: rgba(235,235,245,.6);
+      --amber: #ff9f0a; --red: #ff453a;
+      --menu: rgba(44,44,48,.82); --menu-ink: #f2f2f4; --menu-2: #8e8e93; --menu-hi: #0a6cdf;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body { margin: 0; color: var(--ink); font: 400 15px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased; background: #dfe6f2; }
+  @media (prefers-color-scheme: dark) { body { background: #0e1220; } }
+  .wall { position: fixed; inset: 0; background: var(--wall); z-index: -1; }
+  a { color: var(--accent); }
+  :focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 2px; }
+
+  /* Menu bar */
+  .menubar { position: sticky; top: 0; z-index: 30; height: 26px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 10px 0 14px; background: var(--bar); color: var(--bar-ink);
+    -webkit-backdrop-filter: blur(30px) saturate(1.8); backdrop-filter: blur(30px) saturate(1.8); font-size: 13px; }
+  .menubar nav { display: flex; align-items: center; height: 100%; }
+  .menubar nav a { color: inherit; text-decoration: none; padding: 0 9px; height: 22px; display: flex; align-items: center; border-radius: 5px; }
+  .menubar nav a:first-child { font-weight: 700; }
+  .menubar nav a:hover { background: color-mix(in srgb, var(--bar-ink) 12%, transparent); }
+  .menubar .right { display: flex; align-items: center; gap: 4px; }
+  .menubar button { appearance: none; border: 0; background: transparent; color: inherit; height: 22px; padding: 0 7px; border-radius: 5px;
+    display: flex; align-items: center; cursor: default; }
+  .menubar button[aria-expanded="true"], .menubar button:hover { background: color-mix(in srgb, var(--bar-ink) 14%, transparent); }
+  .menubar button svg { width: 18px; height: 14px; }
+  .clock { padding: 0 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  @media (max-width: 640px) { .menubar nav a:not(:first-child) { display: none; } }
+
+  /* Windows */
+  .desk { max-width: 1120px; margin: 0 auto; padding: 48px 28px 160px; display: grid; grid-template-columns: repeat(12, 1fr); gap: 36px 28px; }
+  @media (max-width: 760px) { .desk { padding: 24px 16px 200px; gap: 24px; } }
+  .win { background: var(--win); border-radius: 12px; box-shadow: var(--win-shadow); overflow: hidden; scroll-margin-top: 44px; }
+  .win.flash { animation: flash .9s ease-out 1; }
+  @keyframes flash { 0% { box-shadow: 0 0 0 4px var(--accent), var(--win-shadow); } 100% { box-shadow: var(--win-shadow); } }
+  .tb { height: 38px; display: flex; align-items: center; padding: 0 14px; background: var(--win-title); border-bottom: 1px solid var(--win-line);
+    position: relative; font-size: 13px; font-weight: 600; color: var(--muted); }
+  .tb .lights { display: flex; gap: 8px; }
+  .tb .lights i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+  .tb .lights i:nth-child(1) { background: #ff5f57; } .tb .lights i:nth-child(2) { background: #febc2e; } .tb .lights i:nth-child(3) { background: #28c840; }
+  .tb h2 { position: absolute; left: 0; right: 0; text-align: center; margin: 0; font: inherit; pointer-events: none; }
+  .wb { padding: 28px 30px 30px; }
+  @media (max-width: 560px) { .wb { padding: 22px 18px 24px; } }
+  .w-about { grid-column: 1 / 9; }
+  .w-platforms { grid-column: 4 / 13; }
+  .w-modules { grid-column: 1 / 10; }
+  .w-settings { grid-column: 1 / 7; align-self: start; background: transparent; box-shadow: none; overflow: visible; }
+  .w-thresholds { grid-column: 7 / 13; }
+  .w-privacy { grid-column: 2 / 11; }
+  @media (max-width: 900px) { .w-about, .w-platforms, .w-modules, .w-settings, .w-thresholds, .w-privacy { grid-column: 1 / 13; } }
+  .w-settings img { width: 100%; max-width: 440px; height: auto; display: block; border-radius: 12px;
+    box-shadow: 0 24px 60px -18px rgba(0,0,0,.5), 0 0 0 .5px rgba(0,0,0,.2); margin: 0 auto; }
+  .w-settings p { font-size: 13px; color: var(--muted); text-align: center; margin: 14px auto 0; max-width: 40ch;
+    background: color-mix(in srgb, var(--win) 70%, transparent); border-radius: 8px; padding: 6px 10px;
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+
+  .app { display: flex; gap: 20px; align-items: center; margin-bottom: 22px; }
+  .icon { width: 76px; height: 76px; border-radius: 18px; flex: 0 0 auto; display: grid; place-items: center;
+    background: linear-gradient(160deg, #5b5b60, #252528); box-shadow: 0 10px 24px -10px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.18); }
+  .icon svg { width: 54px; height: 54px; }
+  h1 { margin: 0; font-size: clamp(1.8rem, 4.4vw, 2.6rem); line-height: 1.05; letter-spacing: -.03em; font-weight: 700; }
+  .sub { margin: 4px 0 0; color: var(--muted); font-size: 15px; }
+  .wb p { margin: 0 0 14px; }
+  .wb p:last-child { margin-bottom: 0; }
+  .muted { color: var(--muted); }
+  code { font: 12.5px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--chip); border: 1px solid var(--sep); border-radius: 4px; padding: 0 4px; white-space: nowrap; }
+  .nw { white-space: nowrap; }
+  .build { display: block; font-weight: 400; color: var(--muted); font-size: 12.5px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 18px 0; }
+  .chips span { background: var(--chip); border: 1px solid var(--sep); border-radius: 6px; padding: 3px 9px; font-size: 12.5px; font-weight: 500; color: var(--muted); }
+  .hint { display: flex; gap: 10px; align-items: flex-start; background: color-mix(in srgb, var(--accent) 10%, var(--win));
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 10px; padding: 11px 14px; font-size: 14px; margin-top: 20px; }
+  .hint svg { flex: 0 0 auto; width: 18px; height: 18px; margin-top: 2px; color: var(--accent); }
+  h3 { margin: 0 0 12px; font-size: 20px; letter-spacing: -.02em; }
+
+  .list { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; margin: 18px 0 0; padding: 0; list-style: none; }
+  @media (max-width: 560px) { .list { grid-template-columns: 1fr; } }
+  .list li { padding: 10px 0; border-bottom: 1px solid var(--sep); font-size: 14px; color: var(--muted); line-height: 1.45; }
+  .list li b { color: var(--ink); font-weight: 600; display: block; }
+  .shots { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 22px; }
+  @media (max-width: 560px) { .shots { grid-template-columns: 1fr; } }
+  .shots figure { margin: 0; background: var(--wall); border-radius: 10px; padding: 22px 12px 12px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .shots img { max-width: 100%; height: auto; display: block; }
+  .shots figcaption { font-size: 12.5px; color: var(--ink); text-align: center; background: color-mix(in srgb, var(--win) 75%, transparent); padding: 4px 10px; border-radius: 6px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 16px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--sep); font-weight: 400; vertical-align: top; }
+  thead th { font-size: 11.5px; font-weight: 600; color: var(--muted); }
+  tbody tr:nth-child(odd) { background: color-mix(in srgb, var(--chip) 60%, transparent); }
+  tbody th { font-weight: 600; }
+  td { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+
+  /* Floating panel replica */
+  .hud-wrap { position: fixed; z-index: 40; left: -9999px; top: 0; touch-action: none; cursor: grab; border-radius: 12px; }
+  .hud-wrap.dragging { cursor: grabbing; }
+  .hud-wrap[hidden] { display: none; }
+  .hud { zoom: 1.3; width: 188px; padding: 8px; border-radius: 12px; background: var(--hud-bg);
+    -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7); border: .5px solid var(--hud-line);
+    font: 400 11px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; font-variant-numeric: tabular-nums;
+    color: var(--hud-ink); user-select: none; -webkit-user-select: none; }
+  @media (max-width: 560px) { .hud { zoom: 1; } }
+  .hud .r { display: grid; grid-template-columns: 30px 50px 80px; column-gap: 6px; height: 18px; align-items: center; }
+  .hud .r.mod { margin-top: 4px; }
+  .hud .r:first-child { margin-top: 0; }
+  .hud .l, .hud .v i { color: var(--hud-2); font-style: normal; }
+  .hud .v { display: flex; justify-content: space-between; }
+  .hud .v b { font-weight: 400; }
+  .hud svg { width: 80px; height: 12px; display: block; color: var(--hud-2); }
+  .hud .s1 .v b { color: var(--amber); font-weight: 600; } .hud .s1 svg { color: var(--amber); }
+  .hud .s2 .v b { color: var(--red); font-weight: 600; } .hud .s2 svg { color: var(--red); }
+
+  /* Menu */
+  .menu { position: fixed; z-index: 50; min-width: 210px; padding: 5px; border-radius: 9px; background: var(--menu); color: var(--menu-ink);
+    -webkit-backdrop-filter: blur(30px) saturate(1.8); backdrop-filter: blur(30px) saturate(1.8);
+    box-shadow: 0 0 0 .5px rgba(0,0,0,.25), 0 12px 32px -8px rgba(0,0,0,.4); font-size: 13px; }
+  .menu[hidden] { display: none; }
+  .menu button { appearance: none; border: 0; background: transparent; color: inherit; font: inherit; width: 100%; text-align: left;
+    display: flex; justify-content: space-between; gap: 24px; padding: 4px 10px; border-radius: 5px; cursor: default; }
+  .menu button kbd { font: inherit; color: var(--menu-2); }
+  .menu button:hover, .menu button:focus { background: var(--menu-hi); color: #fff; outline: none; }
+  .menu button:hover kbd, .menu button:focus kbd { color: rgba(255,255,255,.8); }
+  .menu hr { border: 0; border-top: 1px solid color-mix(in srgb, var(--menu-ink) 14%, transparent); margin: 5px 8px; }
+
+  .toast { position: fixed; z-index: 60; left: 50%; top: 40px; transform: translateX(-50%); background: var(--menu); color: var(--menu-ink);
+    -webkit-backdrop-filter: blur(30px); backdrop-filter: blur(30px); padding: 9px 14px; border-radius: 10px; font-size: 13px;
+    box-shadow: 0 0 0 .5px rgba(0,0,0,.2), 0 10px 30px -10px rgba(0,0,0,.4); max-width: calc(100% - 32px); opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.on { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { .toast { transition: none; } .win.flash { animation: none; } html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+  <div class="wall" aria-hidden="true"></div>
+
+  <header class="menubar">
+    <nav aria-label="Sections">
+      <a href="#about">meters</a><a href="#platforms">Platforms</a><a href="#modules">Modules</a><a href="#settings">Settings</a><a href="#thresholds">Thresholds</a><a href="#privacy">Privacy</a>
+    </nav>
+    <div class="right">
+      <button type="button" id="gauge" aria-label="meters menu" aria-haspopup="menu" aria-expanded="false">
+        <svg viewBox="0 0 18 14" aria-hidden="true"><path d="M2 12a7 7 0 0 1 14 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M4.4 7.6l1 .6M9 5v1.2M13.6 7.6l-1 .6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M9 12L6.6 8.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+      <span class="clock" id="clock"></span>
+    </div>
+  </header>
+
+  <main class="desk">
+    <article class="win w-about" id="about">
+      <div class="tb"><span class="lights" aria-hidden="true"><i></i><i></i><i></i></span><h2>About meters</h2></div>
+      <div class="wb">
+        <div class="app">
+          <span class="icon" aria-hidden="true"><svg viewBox="0 0 30 30"><path d="M5 21a10 10 0 0 1 20 0" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M15 21l-4-6.8" stroke="#ff9f0a" stroke-width="2.2" stroke-linecap="round"/><circle cx="15" cy="21" r="2" fill="#fff"/></svg></span>
+          <div><h1>meters</h1><p class="sub">The system monitor you leave visible, on Mac, Windows, and Linux.</p></div>
+        </div>
+        <p>Activity Monitor, Task Manager, and btop are built for investigation; keeping them open costs screen space and attention. Menu bar and tray monitors squeeze into a narrow, crowded strip.</p>
+        <p class="muted">meters keeps the few metrics you care about in a small floating panel that stays on screen while you work. It floats above other windows, never takes keyboard focus, and stays grey until a reading deserves your attention.</p>
+        <div class="chips"><span>Mac</span><span>Windows</span><span>Linux</span><span>No network access</span></div>
+        <p class="muted" style="font-size:13.5px"><b style="color:var(--ink)">Status, Nov 2, 2026:</b> The native Mac app's v1 is feature-complete and in daily use. Signed and notarized downloads are planned, with a notify-only update check. A Rust port, meters-rust, brings meters to Windows and Linux and also runs on Mac; see <a href="#platforms">Platforms</a>.</p>
+        <div class="hint">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 9v5M10 6.2v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <span>The panel in the corner is a live replica. Drag it to an edge or corner and it snaps into line; right-click it, or click the gauge in the menu bar, for its menu. Scroll the page: it stays where you put it.</span>
+        </div>
+      </div>
+    </article>
+
+    <article class="win w-platforms" id="platforms">
+      <div class="tb"><span class="lights" aria-hidden="true"><i></i><i></i><i></i></span><h2>Platforms</h2></div>
+      <div class="wb">
+        <h3>Mac, Windows, and Linux.</h3>
+        <p class="muted">There are two builds. The native Swift app is the reference on Mac. <code>tonylchang/meters-rust</code> is a port of it, written in Rust with Slint, that runs on all three. It follows the same design, thresholds, and privacy rules, but feature parity is not complete.</p>
+        <table>
+          <thead><tr><th scope="col">Platform</th><th scope="col">Where it stands</th></tr></thead>
+          <tbody>
+            <tr><th scope="row" class="nw">Mac<span class="build"><a href="https://github.com/tonylchang/meters">meters</a></span></th><td>Feature-complete v1 with all nine modules. Apple Silicon, macOS 26 or later, MIT License. <a href="https://github.com/tonylchang/meters#build-from-source">Build it from source</a> until signed downloads arrive.</td></tr>
+            <tr><th scope="row" class="nw">Mac<span class="build">meters-rust</span></th><td>Also runs on a Mac, but reads only CPU, memory, and swap there so far; network, disk, GPU, battery, thermal, and free space are not wired up on Mac yet. The native app is the one to use there.</td></tr>
+            <tr><th scope="row" class="nw">Windows<span class="build">meters-rust</span></th><td>Topmost utility window and system tray. Built for Windows 10 and 11; tested natively on Windows Server 2022 so far.</td></tr>
+            <tr><th scope="row" class="nw">Linux<span class="build">meters-rust</span></th><td>GNOME, KDE Plasma, Xfce, and Cinnamon. X11 sessions work directly; GNOME uses a bundled Shell extension, and KDE on Wayland a bundled KWin script.</td></tr>
+          </tbody>
+        </table>
+        <p class="muted" style="font-size:13.5px;margin-top:14px">Readings depend on what each OS offers, and an unavailable one shows n/a, never an invented zero. Windows has no memory pressure or thermal state. Linux takes memory pressure from kernel PSI and thermal state from hardware trip points. GPU needs driver support, so common Intel setups on Linux show n/a.</p>
+        <p class="muted" style="font-size:13.5px"><b style="color:var(--ink)">meters-rust</b> has no published releases or installers yet, and its repository is private for now.</p>
+      </div>
+    </article>
+
+    <article class="win w-modules" id="modules">
+      <div class="tb"><span class="lights" aria-hidden="true"><i></i><i></i><i></i></span><h2>Modules</h2></div>
+      <div class="wb">
+        <h3>Nine modules, each optional and reorderable.</h3>
+        <p class="muted">The default is three rows: CPU, memory, and network. The panel's width and height follow the modules and forms you pick. These descriptions are for the Mac app; <a href="#platforms">Platforms</a> covers what differs elsewhere.</p>
+        <ul class="list">
+          <li><b>CPU</b>Total, or each core cluster your Mac reports, such as Super and Performance on M5 chips</li>
+          <li><b>Memory</b>Measured as Activity Monitor measures it; highlighting follows memory pressure</li>
+          <li><b>GPU</b>Device utilization</li>
+          <li><b>Network</b>Download and upload; the one-row form names Wi-Fi</li>
+          <li><b>Disk</b>Read and write, naming the physical disk, such as disk0</li>
+          <li><b>Battery</b>Charge, with an arrow for the direction it is actually moving</li>
+          <li><b>Thermal</b>OK, Warm, Hot, or Critical</li>
+          <li><b>Swap</b>Swap in use</li>
+          <li><b>Free space</b>The startup disk's available space, as Finder counts it</li>
+        </ul>
+        <div class="shots">
+          <figure><img src="/images/hud-gauges.png" width="165" height="158" alt="The panel with bar gauges for CPU and its clusters, memory, GPU, battery, and free space."><figcaption>Bar gauges</figcaption></figure>
+          <figure><img src="/images/hud-states.png" width="188" height="114" alt="The panel after a few seconds of full CPU load: the CPU total and both cluster rows read 97 to 100% in red, while memory and network stay grey."><figcaption>Sustained full load</figcaption></figure>
+        </div>
+      </div>
+    </article>
+
+    <section class="win w-settings" id="settings" aria-label="Settings">
+      <img src="/images/settings-modules.png" width="440" height="428" alt="The Settings window's Modules tab: a reorderable list of the nine modules with checkboxes, and form pickers for CPU, Network, and Disk.">
+      <p>Settings has four tabs: General, Modules, Thresholds, and HUD. Readings every 0.5, 1, 2, or 5 seconds.</p>
+    </section>
+
+    <article class="win w-thresholds" id="thresholds">
+      <div class="tb"><span class="lights" aria-hidden="true"><i></i><i></i><i></i></span><h2>Thresholds</h2></div>
+      <div class="wb">
+        <h3>Quiet until interesting.</h3>
+        <p class="muted">A row turns amber or red, with its value in semibold, only after 3 consecutive readings past a threshold, and returns to grey after 3 back under. If meters looks quiet, the machine is probably fine.</p>
+        <table>
+          <thead><tr><th scope="col">Module</th><th scope="col"><span class="dot" style="background:var(--amber)" aria-hidden="true"></span>Amber</th><th scope="col"><span class="dot" style="background:var(--red)" aria-hidden="true"></span>Red</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">CPU</th><td>70% to 80%</td><td>above 80%</td></tr>
+            <tr><th scope="row">Memory</th><td>pressure warning</td><td>pressure critical</td></tr>
+            <tr><th scope="row">GPU</th><td>90% or more</td><td>none</td></tr>
+            <tr><th scope="row">Battery</th><td>20% or below</td><td>10% or below</td></tr>
+            <tr><th scope="row">Thermal</th><td>Hot</td><td>Critical</td></tr>
+            <tr><th scope="row">Swap</th><td>over 1 GB</td><td>over 8 GB</td></tr>
+            <tr><th scope="row">Free space</th><td>under 10%</td><td>under 5%</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="win w-privacy" id="privacy">
+      <div class="tb"><span class="lights" aria-hidden="true"><i></i><i></i><i></i></span><h2>Privacy and performance</h2></div>
+      <div class="wb">
+        <h3>No network connections. Under 1% of one core.</h3>
+        <p class="muted">On every platform, meters opens no network connections and has no analytics or crash reporting. It needs no administrator password or privileged helper, and no extra permission on a Mac; metric history stays in memory and is gone when you quit.</p>
+        <p><a href="privacy.html">Read the Privacy Policy</a></p>
+        <table>
+          <thead><tr><th scope="col">Measured</th><th scope="col">First data</th><th scope="col">Self CPU</th><th scope="col">Footprint</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Oct 17, 2026</th><td>0.376 s</td><td>0.836%</td><td>25.3 MB</td></tr>
+            <tr><th scope="row">Oct 12, 2026</th><td>0.375 s</td><td>0.913%</td><td>25.5 MB</td></tr>
+            <tr><th scope="row">Oct 2, 2026</th><td>0.394 s</td><td>0.550%</td><td>25.1 MB</td></tr>
+          </tbody>
+        </table>
+        <p class="muted" style="font-size:12.5px;margin-top:12px">M5 Max, 18 cores, macOS 27.2, averaged over five minutes. Targets: under 1 s, under 1% of one core, under 50 MB. Measurements on one Mac, not guarantees.</p>
+        <p class="muted" style="font-size:12.5px;margin-top:8px">meters-rust shares those targets. Five-minute test sessions, October 2026: 0.11% of one core and 25.1 MiB on Windows Server, 0.30% and 21.4 MiB on Xfce, 0.18% and 19.9 MiB on GNOME. GNOME's compositor adds an estimated 1.54% in a software-rendered session, which puts the combined figure over the 1% target; real hardware has not been measured yet.</p>
+      </div>
+    </article>
+  </main>
+
+  <div class="hud-wrap" id="hudwrap" tabindex="0" role="img" aria-label="A live replica of the meters panel with simulated readings. Drag it with the mouse or move it with the arrow keys; press Shift F10 for its menu.">
+    <div class="hud" id="hud"></div>
+  </div>
+
+  <div class="menu" id="menu" role="menu" hidden>
+    <button type="button" role="menuitem" data-act="toggle"><span id="toggleLabel">Hide HUD</span></button>
+    <button type="button" role="menuitem" data-act="settings"><span>Settings…</span><kbd>⌘,</kbd></button>
+    <hr>
+    <button type="button" role="menuitem" data-act="quit"><span>Quit meters</span><kbd>⌘Q</kbd></button>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    // Live panel replica: rows, thresholds, and the 3-reading rule follow the app's spec; readings are simulated.
+    (function () {
+      var hud = document.getElementById("hud");
+      var N = 60, W = 80, H = 12, NS = "http://www.w3.org/2000/svg";
+      var rows = [
+        { key: "cpu", label: "CPU", t: [70, 80], mod: true },
+        { key: "s", marker: "S", t: [70, 80] },
+        { key: "p", marker: "P", t: [70, 80] },
+        { key: "mem", label: "MEM", mod: true },
+        { key: "gpu", label: "GPU", t: [90, null], mod: true },
+        { key: "down", label: "NET", marker: "↓", rate: true, mod: true },
+        { key: "up", marker: "↑", rate: true }
+      ];
+      function r(a, b) { return a + Math.random() * (b - a); }
+      function fmtRate(v) {
+        if (v < 1000) return String(Math.round(v));
+        var unit = v < 1e6 ? "K" : "M", x = v / (v < 1e6 ? 1e3 : 1e6);
+        return (x < 10 ? x.toFixed(2) : x < 100 ? x.toFixed(1) : String(Math.round(x))) + unit;
+      }
+      function level(row, v) {
+        if (!row.t) return 0;
+        if (row.t[1] != null && v > row.t[1]) return 2;
+        return v >= row.t[0] ? 1 : 0;
+      }
+      var busy = false, left = 10, prev = { s: 2, p: 14 };
+      function sample() {
+        if (--left <= 0) { busy = !busy; left = busy ? Math.round(r(7, 10)) : Math.round(r(18, 26)); }
+        var s = busy ? r(96, 100) : prev.s * .5 + r(0, 6) * .5;
+        var p = busy ? r(92, 99) : prev.p * .5 + r(6, 24) * .5;
+        prev = { s: s, p: p };
+        var spike = Math.random() < .12;
+        return {
+          s: s, p: p, cpu: (6 * s + 12 * p) / 18, mem: 70 + r(-.6, .6),
+          gpu: busy ? r(3, 9) : (Math.random() < .2 ? r(0, 2) : 0),
+          down: spike ? r(2e4, 1.4e6) : (Math.random() < .5 ? 0 : r(60, 900)),
+          up: Math.random() < .1 ? r(4e3, 6e4) : (Math.random() < .6 ? 0 : r(40, 400))
+        };
+      }
+      rows.forEach(function (row) {
+        row.el = document.createElement("div");
+        row.el.setAttribute("aria-hidden", "true");
+        var l = document.createElement("span"); l.className = "l"; l.textContent = row.label || "";
+        var v = document.createElement("span"); v.className = "v";
+        var m = document.createElement("i"); m.textContent = row.marker || "";
+        row.val = document.createElement("b");
+        v.appendChild(m); v.appendChild(row.val);
+        var svg = document.createElementNS(NS, "svg");
+        svg.setAttribute("viewBox", "0 0 " + W + " " + H); svg.setAttribute("preserveAspectRatio", "none");
+        row.path = document.createElementNS(NS, "path"); row.path.setAttribute("fill", "currentColor");
+        svg.appendChild(row.path);
+        row.el.appendChild(l); row.el.appendChild(v); row.el.appendChild(svg);
+        hud.appendChild(row.el);
+        row.series = []; row.state = 0; row.cand = 0; row.n = 0;
+      });
+      function push(s) {
+        rows.forEach(function (row) {
+          var v = s[row.key];
+          row.series.push(v); if (row.series.length > N) row.series.shift();
+          var L = level(row, v);
+          if (L === row.state) { row.cand = L; row.n = 0; }
+          else { if (L === row.cand) row.n++; else { row.cand = L; row.n = 1; } if (row.n >= 3) { row.state = L; row.n = 0; } }
+        });
+      }
+      function draw() {
+        rows.forEach(function (row) {
+          var ser = row.series, last = ser[ser.length - 1];
+          var max = row.rate ? Math.max(1e5, Math.max.apply(null, ser)) : 100;
+          var d = "M0 " + H, step = W / (N - 1), off = N - ser.length;
+          for (var i = 0; i < ser.length; i++) {
+            var x = (off + i) * step, y = H - Math.min(1, ser[i] / max) * H;
+            d += (i === 0 ? " L" + x.toFixed(2) + " " + H : "") + " L" + x.toFixed(2) + " " + y.toFixed(2);
+          }
+          row.path.setAttribute("d", d + " L" + W + " " + H + " Z");
+          row.val.textContent = row.rate ? fmtRate(last) : Math.round(last) + "%";
+          row.el.className = "r" + (row.mod ? " mod" : "") + (row.state ? " s" + row.state : "");
+        });
+      }
+      var keep = left; left = 1e9;
+      for (var i = 0; i < N; i++) push(sample());
+      left = keep;
+      draw();
+      setInterval(function () { if (!document.hidden) { push(sample()); draw(); } }, 1000);
+    })();
+
+    // Placement: drag anywhere; released within 24 pt of an edge it snaps into line, and near a
+    // corner it settles into the corner. It remembers its position and keeps its edge on resize.
+    (function () {
+      var wrap = document.getElementById("hudwrap");
+      var menu = document.getElementById("menu");
+      var gauge = document.getElementById("gauge");
+      var toast = document.getElementById("toast");
+      var KEY = "meters-desk-hud", INSET = 12, SNAP = 24, BAR = 26;
+      var pos = { x: 0, y: 0, ax: "r", ay: "b" };
+      function minY() { return BAR + INSET; }
+      function size() { var b = wrap.getBoundingClientRect(); return { w: b.width, h: b.height }; }
+      function apply() {
+        var s = size();
+        if (pos.ax === "r") pos.x = innerWidth - s.w - INSET;
+        if (pos.ax === "l") pos.x = INSET;
+        if (pos.ay === "b") pos.y = innerHeight - s.h - INSET;
+        if (pos.ay === "t") pos.y = minY();
+        pos.x = Math.max(INSET, Math.min(pos.x, innerWidth - s.w - INSET));
+        pos.y = Math.max(minY(), Math.min(pos.y, innerHeight - s.h - INSET));
+        wrap.style.left = pos.x + "px"; wrap.style.top = pos.y + "px";
+      }
+      function snap() {
+        var s = size();
+        pos.ax = pos.x - INSET < SNAP ? "l" : innerWidth - s.w - INSET - pos.x < SNAP ? "r" : null;
+        pos.ay = pos.y - minY() < SNAP ? "t" : innerHeight - s.h - INSET - pos.y < SNAP ? "b" : null;
+        apply();
+        try { localStorage.setItem(KEY, JSON.stringify(pos)); } catch (e) {}
+      }
+      try { var saved = JSON.parse(localStorage.getItem(KEY)); if (saved && typeof saved.x === "number") pos = saved; } catch (e) {}
+      apply();
+      addEventListener("resize", apply);
+
+      var drag = null;
+      wrap.addEventListener("pointerdown", function (e) {
+        if (e.button !== 0) return;
+        closeMenu();
+        drag = { dx: e.clientX - pos.x, dy: e.clientY - pos.y };
+        wrap.setPointerCapture(e.pointerId); wrap.classList.add("dragging");
+      });
+      wrap.addEventListener("pointermove", function (e) {
+        if (!drag) return;
+        pos.ax = pos.ay = null; pos.x = e.clientX - drag.dx; pos.y = e.clientY - drag.dy; apply();
+      });
+      function endDrag() { if (!drag) return; drag = null; wrap.classList.remove("dragging"); snap(); }
+      wrap.addEventListener("pointerup", endDrag);
+      wrap.addEventListener("pointercancel", endDrag);
+      wrap.addEventListener("keydown", function (e) {
+        var d = e.shiftKey ? 40 : 8, moves = { ArrowLeft: [-d, 0], ArrowRight: [d, 0], ArrowUp: [0, -d], ArrowDown: [0, d] };
+        if (moves[e.key]) {
+          e.preventDefault(); pos.ax = pos.ay = null; pos.x += moves[e.key][0]; pos.y += moves[e.key][1]; apply();
+          try { localStorage.setItem(KEY, JSON.stringify(pos)); } catch (err) {}
+        } else if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+          e.preventDefault(); var b = wrap.getBoundingClientRect(); openMenu(b.left, b.top, wrap);
+        }
+      });
+
+      // The menu bar item and a right-click on the panel open the same menu.
+      var opener = null;
+      function openMenu(x, y, from) {
+        document.getElementById("toggleLabel").textContent = wrap.hidden ? "Show HUD" : "Hide HUD";
+        menu.hidden = false; opener = from;
+        var b = menu.getBoundingClientRect();
+        menu.style.left = Math.max(8, Math.min(x, innerWidth - b.width - 8)) + "px";
+        menu.style.top = Math.max(8, Math.min(y, innerHeight - b.height - 8)) + "px";
+        gauge.setAttribute("aria-expanded", String(from === gauge));
+        menu.querySelector("button").focus();
+      }
+      function closeMenu(refocus) {
+        if (menu.hidden) return;
+        menu.hidden = true; gauge.setAttribute("aria-expanded", "false");
+        if (refocus && opener && !opener.hidden) opener.focus();
+      }
+      wrap.addEventListener("contextmenu", function (e) { e.preventDefault(); openMenu(e.clientX, e.clientY, wrap); });
+      gauge.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (!menu.hidden) { closeMenu(); return; }
+        var b = gauge.getBoundingClientRect(); openMenu(b.right - 210, b.bottom + 4, gauge);
+      });
+      document.addEventListener("pointerdown", function (e) { if (!menu.contains(e.target) && e.target !== gauge && !gauge.contains(e.target)) closeMenu(); });
+      addEventListener("scroll", function () { closeMenu(); }, { passive: true });
+      menu.addEventListener("keydown", function (e) {
+        var items = Array.prototype.slice.call(menu.querySelectorAll("button")), i = items.indexOf(document.activeElement);
+        if (e.key === "Escape") { e.preventDefault(); closeMenu(true); }
+        else if (e.key === "ArrowDown") { e.preventDefault(); items[(i + 1) % items.length].focus(); }
+        else if (e.key === "ArrowUp") { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+      });
+      var tt;
+      function say(msg) { toast.textContent = msg; toast.classList.add("on"); clearTimeout(tt); tt = setTimeout(function () { toast.classList.remove("on"); }, 3600); }
+      menu.addEventListener("click", function (e) {
+        var b = e.target.closest("button"); if (!b) return;
+        var act = b.dataset.act; closeMenu();
+        if (act === "toggle") { wrap.hidden = !wrap.hidden; if (!wrap.hidden) { apply(); wrap.focus(); } else gauge.focus(); }
+        if (act === "settings") {
+          var s = document.getElementById("settings"); s.scrollIntoView({ block: "start" });
+          s.classList.remove("flash"); void s.offsetWidth; s.classList.add("flash");
+        }
+        if (act === "quit") { wrap.hidden = true; gauge.focus(); say("meters quit. On this page, the gauge in the menu bar brings it back."); }
+      });
+    })();
+
+    // Menu bar clock.
+    (function () {
+      var el = document.getElementById("clock");
+      function tick() {
+        var d = new Date();
+        el.textContent = d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }).replace(/,/g, "") + "  " +
+          d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+      }
+      tick(); setInterval(tick, 15000);
+    })();
+  </script>
+</body>
+</html>
