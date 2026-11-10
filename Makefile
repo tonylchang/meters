@@ -9,10 +9,12 @@ PACKAGE := Packages/MetersKit
 DERIVED := build/DerivedData
 RELEASE_APP := $(DERIVED)/Build/Products/Release/meters.app
 PROBE := $(PACKAGE)/.build/release/meters-probe
-SWIFT_SOURCES := App $(PACKAGE)/Package.swift $(PACKAGE)/Sources $(PACKAGE)/Tests
+SWIFT_SOURCES := App Tools $(PACKAGE)/Package.swift $(PACKAGE)/Sources $(PACKAGE)/Tests
 XCODEBUILD := xcodebuild -project $(PROJECT) -scheme meters -destination 'platform=macOS,arch=arm64' -derivedDataPath $(DERIVED) -quiet
+STORE_DERIVED := build/AppStoreDerivedData
+STORE_BUILD := xcodebuild -project $(PROJECT) -destination 'platform=macOS,arch=arm64' -derivedDataPath $(STORE_DERIVED) -quiet
 
-.PHONY: help generate build test lint format probe audit smoke perf run stop clean
+.PHONY: help generate build test lint format probe audit smoke perf run stop clean app-store-build app-store-check
 
 help:
 	@echo "make build    Generate the Xcode project; build Debug and Release (warnings are errors)"
@@ -24,6 +26,8 @@ help:
 	@echo "make perf     Measure time to first data, CPU, and memory over 5 minutes"
 	@echo "make run      Build and open the Release app with your own settings"
 	@echo "make stop     Quit any running meters instance"
+	@echo "make app-store-build  Build a development-signed sandbox compatibility app"
+	@echo "make app-store-check  Audit and exercise the sandbox build and real metric sources"
 
 generate:
 	xcodegen generate --quiet
@@ -76,6 +80,15 @@ perf: build probe
 
 run: build
 	open $(RELEASE_APP)
+
+app-store-build: generate
+	@mkdir -p build
+	$(STORE_BUILD) -scheme meters -configuration AppStore build 2>&1 | tee build/app-store-build.log
+
+app-store-check: app-store-build probe
+	$(STORE_BUILD) -scheme meters-sandbox-check -configuration Release build 2>&1 | tee build/app-store-diagnostic-build.log
+	$(STORE_BUILD) -scheme meters-sandbox-check -configuration AppStore build 2>&1 | tee -a build/app-store-diagnostic-build.log
+	scripts/app-store-check.sh $(STORE_DERIVED)/Build/Products $(PROBE)
 
 stop:
 	pkill -x meters || true

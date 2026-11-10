@@ -9,6 +9,8 @@
 set -euo pipefail
 
 APP="$1"
+MODE="${2:-local}"
+[[ "$MODE" = local || "$MODE" = --app-store ]] || { echo "audit: unknown mode: $MODE" >&2; exit 1; }
 APPROVED_ENTITLEMENTS=()
 NETWORK_SYMBOLS='URLSession|NSURLConnection|NSURLDownload|_nw_|CFSocket|CFStreamCreatePairWithSocket|CFHTTP|CFNetService|_getaddrinfo$|_socket$|_connect$'
 NETWORK_FRAMEWORKS='/Network\.framework|/CFNetwork\.framework'
@@ -34,6 +36,18 @@ for binary in "${binaries[@]}"; do
     [ -z "$symbols" ] || fail "$name references networking APIs: $(echo "$symbols" | xargs)"
 done
 
+if [ "$MODE" = --app-store ]; then
+    codesign --verify --deep --strict "$APP"
+    # Fail closed on malformed/missing entitlements; identity capabilities need a separate approval.
+    codesign -d --entitlements - --xml "$APP" 2>/dev/null | python3 -c '
+import plistlib, sys
+actual = plistlib.loads(sys.stdin.buffer.read())
+if actual != {"com.apple.security.app-sandbox": True} or type(actual.get("com.apple.security.app-sandbox")) is not bool:
+    sys.exit("audit: FAIL: expected only app-sandbox=true, got " + repr(actual))
+'
+    APPROVED_ENTITLEMENTS=(com.apple.security.app-sandbox)
+fi
+
 entitlements="$(codesign -d --entitlements - --xml "$APP" 2>/dev/null \
     | plutil -convert json -o - - 2>/dev/null \
     | python3 -c 'import json,sys; print("\n".join(json.load(sys.stdin).keys()))' 2>/dev/null || true)"
@@ -45,5 +59,11 @@ for key in $entitlements; do
     [ "$approved" -eq 1 ] || fail "unapproved entitlement: $key"
 done
 
-[ "$status" -eq 0 ] && echo "audit: PASS (${#binaries[@]} binaries checked, no private frameworks, no networking, no entitlements)"
+if [ "$status" -eq 0 ]; then
+    if [ "$MODE" = --app-store ]; then
+        echo "audit: PASS (${#binaries[@]} binaries checked, no private frameworks, no networking, only app-sandbox=true)"
+    else
+        echo "audit: PASS (${#binaries[@]} binaries checked, no private frameworks, no networking, no entitlements)"
+    fi
+fi
 exit "$status"
