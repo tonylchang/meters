@@ -160,6 +160,10 @@ struct GeneralTab: View {
                 ForEach(MeterTiming.intervalChoices, id: \.self) { Text(SettingsModel.intervalName($0)).tag($0) }
             }
             .pickerStyle(.menu)
+            Section {
+                Button("Privacy Policy…") { model.openPrivacyPolicy() }
+                    .buttonStyle(.link)
+            }
         }
         .formStyle(.grouped)
         // VoiceOver reads the note when it shows.

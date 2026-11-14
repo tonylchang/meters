@@ -8,6 +8,8 @@ import SwiftUI
 @MainActor
 @Observable
 public final class SettingsModel {
+    public static let privacyPolicyURL = URL(string: "https://meters.ns47.com/privacy.html")!
+
     public enum Tab: String, Sendable {
         case general
         case modules
@@ -52,15 +54,18 @@ public final class SettingsModel {
     /// What this Mac can show: whether Battery is offered, and how many rows the CPU clusters form needs.
     public let capabilities: SystemCapabilities
     @ObservationIgnored private let loginItem: any LoginItemService
+    @ObservationIgnored private let openURL: @MainActor (URL) -> Void
 
     public init(
         store: HUDSettingsStore, capabilities: SystemCapabilities = .current(),
-        loginItem: any LoginItemService = SystemLoginItemService()
+        loginItem: any LoginItemService = SystemLoginItemService(),
+        openURL: @escaping @MainActor (URL) -> Void = { _ = NSWorkspace.shared.open($0) }
     ) {
         self.store = store
         self.capabilities = capabilities
         // Read when the window is shown, not at launch, so a launch never queries the login item.
         self.loginItem = loginItem
+        self.openURL = openURL
         tab = store.settingsTab.flatMap(Tab.init(rawValue:)) ?? .modules
         storeObserver = store.addObserver { [weak self] change in
             self?.settingsChanged(change)
@@ -151,6 +156,11 @@ public final class SettingsModel {
     }
 
     // MARK: - General
+
+    /// Hands the policy to the default browser only after the user activates its Settings button.
+    public func openPrivacyPolicy() {
+        openURL(Self.privacyPolicyURL)
+    }
 
     /// Reads macOS's current state, as when the window is shown or becomes key. Clears a failure note.
     public func refreshLoginItem() {

@@ -6,6 +6,7 @@ All notable changes to meters are documented here. The format follows [Keep a Ch
 
 ### Added
 
+- App icon matching the website's gauge artwork, and a Privacy Policy… button in Settings > General that opens the policy in your browser (Nov 09, 2026).
 - MIT license (Oct 12, 2026).
 - One-row NET/DISK forms show device names between the label and the rates: Wi-Fi when counted, and physical disk names such as disk0. The row keeps room for one name; longer disk lists shorten to fit, and VoiceOver reads the full label. Network rates still total all counted interfaces.
 - Floating HUD: a chrome-free, translucent panel with a faint hairline edge and no window shadow, which keeps its drawing cost to the system near zero. It stays above other windows on every Space and over fullscreen apps, without taking focus from the app in use. It sizes itself to its modules, in width and height, fades in and out, remembers whether it is hidden, and adapts to Reduce Transparency, Increase Contrast, and Reduce Motion.

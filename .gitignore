@@ -1,4 +1,5 @@
 .env
+.DS_Store
 
 # Build output and generated projects (see Makefile and project.yml)
 build/

@@ -13,8 +13,11 @@ SWIFT_SOURCES := App Tools $(PACKAGE)/Package.swift $(PACKAGE)/Sources $(PACKAGE
 XCODEBUILD := xcodebuild -project $(PROJECT) -scheme meters -destination 'platform=macOS,arch=arm64' -derivedDataPath $(DERIVED) -quiet
 STORE_DERIVED := build/AppStoreDerivedData
 STORE_BUILD := xcodebuild -project $(PROJECT) -destination 'platform=macOS,arch=arm64' -derivedDataPath $(STORE_DERIVED) -quiet
+STORE_VERSION ?= 1.0.0
+STORE_BUILD_NUMBER ?= 2
+STORE_ARCHIVE := build/Archives/meters-$(STORE_VERSION)-$(STORE_BUILD_NUMBER).xcarchive
 
-.PHONY: help generate build test lint format probe audit smoke perf run stop clean app-store-build app-store-check
+.PHONY: help generate build test lint format probe audit smoke perf run stop clean app-store-build app-store-check app-store-archive
 
 help:
 	@echo "make build    Generate the Xcode project; build Debug and Release (warnings are errors)"
@@ -28,6 +31,7 @@ help:
 	@echo "make stop     Quit any running meters instance"
 	@echo "make app-store-build  Build a development-signed sandbox compatibility app"
 	@echo "make app-store-check  Audit and exercise the sandbox build and real metric sources"
+	@echo "make app-store-archive  Create a local release candidate archive (STORE_BUILD_NUMBER=2 by default)"
 
 generate:
 	xcodegen generate --quiet
@@ -89,6 +93,13 @@ app-store-check: app-store-build probe
 	$(STORE_BUILD) -scheme meters-sandbox-check -configuration Release build 2>&1 | tee build/app-store-diagnostic-build.log
 	$(STORE_BUILD) -scheme meters-sandbox-check -configuration AppStore build 2>&1 | tee -a build/app-store-diagnostic-build.log
 	scripts/app-store-check.sh $(STORE_DERIVED)/Build/Products $(PROBE)
+
+app-store-archive: generate
+	@mkdir -p build/Archives
+	$(STORE_BUILD) -scheme meters -configuration AppStore -archivePath $(STORE_ARCHIVE) \
+		MARKETING_VERSION=$(STORE_VERSION) CURRENT_PROJECT_VERSION=$(STORE_BUILD_NUMBER) archive \
+		2>&1 | tee build/app-store-archive.log
+	scripts/audit.sh $(STORE_ARCHIVE)/Products/Applications/meters.app --app-store
 
 stop:
 	pkill -x meters || true

@@ -59,6 +59,7 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: meters
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.utilities
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # Agent app: no Dock icon or app switcher entry. Also required for the HUD to appear over
         # other apps' fullscreen Spaces.
         INFOPLIST_KEY_LSUIElement: YES

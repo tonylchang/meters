@@ -14,6 +14,26 @@ struct SettingsWindowTests {
 
     static let laptop = SystemCapabilities(hasBattery: true, cpuClusters: 2)
 
+    @Test("The policy opens only on request, at the approved URL, without changing settings or login items")
+    func privacyPolicy() {
+        let store = HUDSettingsStore(defaults: temporary.defaults)
+        let loginItem = FakeLoginItemService()
+        var opened: [URL] = []
+        let model = SettingsModel(
+            store: store, capabilities: Self.laptop, loginItem: loginItem,
+            openURL: { opened.append($0) })
+        #expect(opened.isEmpty)
+        model.refreshLoginItem()
+        #expect(opened.isEmpty)
+        let before = temporary.defaults.persistentDomain(forName: temporary.suiteName)
+        model.openPrivacyPolicy()
+        #expect(opened.map(\.absoluteString) == ["https://meters.ns47.com/privacy.html"])
+        #expect(loginItem.state.withLock { $0.calls }.isEmpty)
+        #expect(
+            NSDictionary(dictionary: temporary.defaults.persistentDomain(forName: temporary.suiteName) ?? [:])
+                == NSDictionary(dictionary: before ?? [:]))
+    }
+
     func makeModel(
         _ capabilities: SystemCapabilities = laptop, loginItem: FakeLoginItemService = FakeLoginItemService()
     ) -> (SettingsModel, HUDSettingsStore) {
